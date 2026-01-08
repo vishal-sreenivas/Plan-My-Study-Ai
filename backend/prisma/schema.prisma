@@ -1,0 +1,80 @@
+// Prisma Schema for PlanMyStudy AI
+// This defines our database structure with User, Course, and Progress models
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model: Stores user authentication and profile information
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String   // Hashed password using bcrypt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // One user can have many courses
+  courses   Course[]
+  activities ActivityLog[]
+}
+
+// Course model: Stores generated course information
+model Course {
+  id        String   @id @default(uuid())
+  userId    String
+  topic     String   // The learning topic (e.g., "React Development")
+  level     String   // Skill level: beginner, intermediate, advanced
+  days      Int      // Total number of days for the course
+  timePerDay Int     // Time per day in minutes
+  planJson  String   @db.Text // JSON string containing the full course plan
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  progress  Progress[]
+  
+  @@index([userId])
+}
+
+// Progress model: Tracks user's lesson completion
+model Progress {
+  id        String   @id @default(uuid())
+  courseId  String
+  day       Int      // Day number (1, 2, 3, ...)
+  lessonId  String   // Identifier for the lesson within the day
+  completed Boolean  @default(false)
+  completedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  
+  @@unique([courseId, day, lessonId])
+  @@index([courseId])
+}
+
+// ActivityLog model: Tracks daily user activity for contribution calendar
+model ActivityLog {
+  id        String   @id @default(uuid())
+  userId    String
+  date      DateTime @db.Date // Date in YYYY-MM-DD format
+  count     Int      @default(1) // Number of activities on this date
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+}
+
