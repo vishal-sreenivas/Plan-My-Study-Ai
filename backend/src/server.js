@@ -21,7 +21,6 @@ const allowedOrigins = [
   env.frontendUrl,
   'http://localhost:5173',
   'http://localhost:3000',
-  // Add your Vercel URL here if needed
 ].filter(Boolean); // Remove undefined values
 
 app.use(
@@ -30,14 +29,19 @@ app.use(
       // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
       
-      if (allowedOrigins.includes(origin)) {
+      // Allow if origin is in allowed list
+      if (allowedOrigins.some(allowed => origin === allowed || origin.startsWith(allowed))) {
         callback(null, true);
       } else {
-        // In production, be more strict
-        if (env.nodeEnv === 'production') {
-          console.warn(`CORS blocked origin: ${origin}`);
+        // Log blocked origin for debugging
+        console.warn(`⚠️  CORS: Blocked origin: ${origin}`);
+        console.warn(`   Allowed origins: ${allowedOrigins.join(', ')}`);
+        // In development, allow all; in production, be strict
+        if (env.nodeEnv === 'development') {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
         }
-        callback(null, true); // Allow all origins in development, or be strict in production
       }
     },
     credentials: true,
