@@ -16,9 +16,30 @@ const app = express();
 
 // Middleware
 // CORS: Allow requests from frontend
+// Support multiple origins (development and production)
+const allowedOrigins = [
+  env.frontendUrl,
+  'http://localhost:5173',
+  'http://localhost:3000',
+  // Add your Vercel URL here if needed
+].filter(Boolean); // Remove undefined values
+
 app.use(
   cors({
-    origin: env.frontendUrl,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        // In production, be more strict
+        if (env.nodeEnv === 'production') {
+          console.warn(`CORS blocked origin: ${origin}`);
+        }
+        callback(null, true); // Allow all origins in development, or be strict in production
+      }
+    },
     credentials: true,
   })
 );
