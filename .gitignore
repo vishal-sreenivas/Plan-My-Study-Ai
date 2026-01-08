@@ -35,10 +35,13 @@ Thumbs.db
 *.swo
 *~
 
-# Prisma (keep migrations, they're needed)
+# Prisma (keep migrations, they're needed for deployment)
 # backend/prisma/migrations/ - Keep migrations for deployment
 
 # Misc
 .cache/
 .temp/
 
+# Deployment
+.vercel
+.render
