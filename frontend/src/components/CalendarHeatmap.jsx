@@ -3,16 +3,22 @@ import { motion } from 'framer-motion';
 import { activityAPI } from '../services/api';
 import toast from 'react-hot-toast';
 
-const CalendarHeatmap = () => {
-  const [activities, setActivities] = useState([]);
+const CalendarHeatmap = ({ activities: propActivities }) => {
+  const [activities, setActivities] = useState(propActivities || []);
   const [totalContributions, setTotalContributions] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!propActivities);
   const [hoveredDay, setHoveredDay] = useState(null);
   const [viewMode, setViewMode] = useState('calendar'); // 'calendar' or 'streak'
 
   useEffect(() => {
-    fetchActivities();
-  }, []);
+    // Only fetch if activities not provided as props
+    if (!propActivities) {
+      fetchActivities();
+    } else {
+      setActivities(propActivities);
+      setLoading(false);
+    }
+  }, [propActivities]);
 
   const fetchActivities = async () => {
     try {

@@ -10,6 +10,7 @@ import { errorHandler } from './utils/errors.js';
 import authRoutes from './routes/authRoutes.js';
 import courseRoutes from './routes/courseRoutes.js';
 import activityRoutes from './routes/activityRoutes.js';
+import noteRoutes from './routes/noteRoutes.js';
 
 // Create Express app
 const app = express();
@@ -68,6 +69,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/course', courseRoutes);
 app.use('/api/activity', activityRoutes);
+app.use('/api/notes', noteRoutes);
 
 // 404 handler
 app.use((req, res) => {

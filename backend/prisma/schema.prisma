@@ -18,10 +18,11 @@ model User {
   password  String   // Hashed password using bcrypt
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   // One user can have many courses
   courses   Course[]
   activities ActivityLog[]
+  notes     Note[]
 }
 
 // Course model: Stores generated course information
@@ -33,14 +34,18 @@ model Course {
   days      Int      // Total number of days for the course
   timePerDay Int     // Time per day in minutes
   planJson  String   @db.Text // JSON string containing the full course plan
+  isPublic  Boolean  @default(false) // Whether course is publicly shareable
+  shareToken String? @unique // Unique token for public access
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   // Relations
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   progress  Progress[]
-  
+  notes     Note[]
+
   @@index([userId])
+  @@index([shareToken])
 }
 
 // Progress model: Tracks user's lesson completion
@@ -69,12 +74,32 @@ model ActivityLog {
   count     Int      @default(1) // Number of activities on this date
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   // Relations
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
   @@unique([userId, date])
   @@index([userId])
   @@index([date])
+}
+
+// Note model: Stores user notes per lesson
+model Note {
+  id        String   @id @default(uuid())
+  userId    String
+  courseId  String
+  day       Int      // Day number (1, 2, 3, ...)
+  lessonId  String   // Identifier for the lesson within the day
+  content   String   @db.Text // Markdown note content
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, day, lessonId])
+  @@index([userId])
+  @@index([courseId])
 }
 

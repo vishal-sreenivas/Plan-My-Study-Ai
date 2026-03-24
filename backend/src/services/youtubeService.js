@@ -295,6 +295,61 @@ const buildSearchQuery = (lesson, courseTopic) => {
 };
 
 /**
+ * Fetch videos for a single lesson (used for parallel fetching)
+ *
+ * @param {object} lesson - Lesson object
+ * @param {string} courseTopic - Overall course topic
+ * @returns {Promise<object>} Object with lesson and fetched videos
+ */
+const fetchVideosForLesson = async (lesson, courseTopic) => {
+  try {
+    const searchQuery = buildSearchQuery(lesson, courseTopic);
+
+    // Search with timeout
+    const searchPromise = searchVideosWithDuration(searchQuery, 8);
+    const timeoutPromise = new Promise((resolve) =>
+      setTimeout(() => resolve([]), 5000) // 5 second timeout
+    );
+
+    const videos = await Promise.race([searchPromise, timeoutPromise]);
+    return { lesson, videos, error: null };
+  } catch (error) {
+    console.error(`[YouTube] Error fetching videos for "${lesson.title}":`, error.message);
+    return { lesson, videos: [], error: error.message };
+  }
+};
+
+/**
+ * Process lessons in batches using Promise.all for parallel fetching
+ *
+ * @param {Array} lessons - Array of lessons
+ * @param {string} courseTopic - Course topic
+ * @param {number} batchSize - Number of parallel requests per batch
+ * @returns {Promise<Array>} Array of {lesson, videos} objects in original order
+ */
+const fetchVideosInBatches = async (lessons, courseTopic, batchSize = 5) => {
+  const results = [];
+
+  for (let i = 0; i < lessons.length; i += batchSize) {
+    const batch = lessons.slice(i, i + batchSize);
+
+    // Fetch all videos in this batch in parallel
+    const batchResults = await Promise.all(
+      batch.map(lesson => fetchVideosForLesson(lesson, courseTopic))
+    );
+
+    results.push(...batchResults);
+
+    // Small delay between batches to avoid rate limiting
+    if (i + batchSize < lessons.length) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }
+
+  return results;
+};
+
+/**
  * Enrich course plan with YouTube videos respecting time budget
  *
  * TIME BUDGET ALLOCATION STRATEGY:
@@ -315,89 +370,94 @@ const buildSearchQuery = (lesson, courseTopic) => {
  * 5. Select highest-scoring video that fits the time budget
  * 6. Fallback to shortest video if none fit
  *
+ * PARALLEL FETCHING:
+ * ==================
+ * - Videos for all lessons in a day are fetched in parallel (batches of 5)
+ * - Video selection is done sequentially to maintain budget tracking
+ * - This provides 3-5x speedup while respecting API rate limits
+ *
  * @param {object} coursePlan - The course plan object from OpenAI
  * @param {number} timePerDay - Daily time budget in minutes (default: 30)
+ * @param {function} onProgress - Optional callback for progress updates (SSE)
  * @returns {Promise<object>} Course plan with videos added to each lesson
  */
-export const enrichCourseWithVideos = async (coursePlan, timePerDay = 30) => {
+export const enrichCourseWithVideos = async (coursePlan, timePerDay = 30, onProgress = null) => {
   try {
-    const courseTopic = coursePlan.topic || '';
+    const courseTopic = coursePlan.topic || coursePlan.overview?.title || '';
     const dailyBudgetSeconds = timePerDay * 60;
+    const totalDays = coursePlan.dailyPlan.length;
 
-    console.log(`[YouTube] Enriching course "${courseTopic}" with ${timePerDay} min/day budget`);
+    console.log(`[YouTube] Enriching course "${courseTopic}" with ${timePerDay} min/day budget (parallel mode)`);
 
     const enrichedDailyPlan = [];
 
-    // Process each day sequentially to manage API rate limits
-    for (const day of coursePlan.dailyPlan) {
+    // Process each day
+    for (let dayIndex = 0; dayIndex < coursePlan.dailyPlan.length; dayIndex++) {
+      const day = coursePlan.dailyPlan[dayIndex];
       let remainingBudgetSeconds = dailyBudgetSeconds;
-      const enrichedLessons = [];
 
-      // Calculate total estimated time for the day to allocate proportionally
+      // Calculate total estimated time for the day
       const totalEstimatedMinutes = day.lessons.reduce(
-        (sum, lesson) => sum + (lesson.estimatedMinutes || 10),
+        (sum, lesson) => sum + (lesson.estimatedMinutes || lesson.timeMinutes || 10),
         0
       );
 
       console.log(`[YouTube] Day ${day.day}: ${day.lessons.length} lessons, ${totalEstimatedMinutes} min estimated`);
 
-      for (const lesson of day.lessons) {
-        try {
-          // Calculate this lesson's share of the time budget
-          const lessonShare = (lesson.estimatedMinutes || 10) / totalEstimatedMinutes;
-          const lessonBudgetSeconds = Math.floor(dailyBudgetSeconds * lessonShare);
+      // Emit progress event
+      if (onProgress) {
+        onProgress({
+          type: 'video-fetching',
+          day: day.day,
+          totalDays,
+          message: `Finding videos for Day ${day.day}...`,
+        });
+      }
 
-          // Build optimized search query
-          const searchQuery = buildSearchQuery(lesson, courseTopic);
+      // PARALLEL FETCH: Get videos for all lessons in this day at once
+      const lessonVideoResults = await fetchVideosInBatches(day.lessons, courseTopic, 5);
 
-          console.log(`[YouTube]   Lesson "${lesson.title}" - searching: "${searchQuery}" (budget: ${Math.floor(remainingBudgetSeconds / 60)}min remaining)`);
+      // SEQUENTIAL SELECT: Process results and select best videos respecting budget
+      const enrichedLessons = [];
 
-          // Search with timeout
-          const searchPromise = searchVideosWithDuration(searchQuery, 8);
-          const timeoutPromise = new Promise((resolve) =>
-            setTimeout(() => resolve([]), 5000) // 5 second timeout
-          );
+      for (const { lesson, videos, error } of lessonVideoResults) {
+        if (error) {
+          enrichedLessons.push({
+            ...lesson,
+            resources: { videos: [] },
+          });
+          continue;
+        }
 
-          const videos = await Promise.race([searchPromise, timeoutPromise]);
+        console.log(`[YouTube]   Lesson "${lesson.title}" - ${videos.length} videos found (budget: ${Math.floor(remainingBudgetSeconds / 60)}min remaining)`);
 
-          // Select the best video within budget
-          const selectedVideo = selectBestVideo(videos, lesson, remainingBudgetSeconds);
+        // Select the best video within budget
+        const selectedVideo = selectBestVideo(videos, lesson, remainingBudgetSeconds);
 
-          if (selectedVideo) {
-            // Update remaining budget
-            remainingBudgetSeconds -= selectedVideo.durationSeconds;
+        if (selectedVideo) {
+          // Update remaining budget
+          remainingBudgetSeconds -= selectedVideo.durationSeconds;
 
-            console.log(`[YouTube]     Selected: "${selectedVideo.title}" (${selectedVideo.durationFormatted}) ${selectedVideo.withinBudget ? '✓' : '⚠ exceeds budget'}`);
+          console.log(`[YouTube]     Selected: "${selectedVideo.title}" (${selectedVideo.durationFormatted}) ${selectedVideo.withinBudget ? '✓' : '⚠ exceeds budget'}`);
 
-            enrichedLessons.push({
-              ...lesson,
-              resources: {
-                videos: [{
-                  id: selectedVideo.id,
-                  title: selectedVideo.title,
-                  description: selectedVideo.description,
-                  thumbnail: selectedVideo.thumbnail,
-                  channelTitle: selectedVideo.channelTitle,
-                  url: selectedVideo.url,
-                  duration: selectedVideo.durationFormatted,
-                  durationSeconds: selectedVideo.durationSeconds,
-                  withinBudget: selectedVideo.withinBudget,
-                }],
-              },
-            });
-          } else {
-            console.log(`[YouTube]     No suitable video found`);
-            enrichedLessons.push({
-              ...lesson,
-              resources: { videos: [] },
-            });
-          }
-
-          // Small delay to avoid rate limiting
-          await new Promise(resolve => setTimeout(resolve, 100));
-
-        } catch (error) {
-          console.error(`[YouTube] Error processing lesson "${lesson.title}":`, error.message);
+          enrichedLessons.push({
+            ...lesson,
+            resources: {
+              videos: [{
+                id: selectedVideo.id,
+                title: selectedVideo.title,
+                description: selectedVideo.description,
+                thumbnail: selectedVideo.thumbnail,
+                channelTitle: selectedVideo.channelTitle,
+                url: selectedVideo.url,
+                duration: selectedVideo.durationFormatted,
+                durationSeconds: selectedVideo.durationSeconds,
+                withinBudget: selectedVideo.withinBudget,
+              }],
+            },
+          });
+        } else {
+          console.log(`[YouTube]     No suitable video found`);
           enrichedLessons.push({
             ...lesson,
             resources: { videos: [] },
@@ -422,6 +482,14 @@ export const enrichCourseWithVideos = async (coursePlan, timePerDay = 30) => {
           budgetSeconds: dailyBudgetSeconds,
           withinBudget: dayVideoDuration <= dailyBudgetSeconds + (TIME_BUFFER_MINUTES * 60),
         },
+      });
+    }
+
+    // Emit completion event
+    if (onProgress) {
+      onProgress({
+        type: 'video-complete',
+        message: 'All videos found!',
       });
     }
 

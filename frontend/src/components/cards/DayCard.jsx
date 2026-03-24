@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import LessonCard from './LessonCard';
 
-const DayCard = ({ day, isExpanded, onToggle, onLessonToggle, completionMap = new Map(), index = 0 }) => {
+const DayCard = ({ day, courseId, isExpanded, onToggle, onLessonToggle, completionMap = new Map(), index = 0 }) => {
   if (!day) return null;
   
   const dayTotalTime = day.lessons?.reduce((sum, l) => sum + (l.timeMinutes || 0), 0) || 0;
@@ -94,6 +94,7 @@ const DayCard = ({ day, isExpanded, onToggle, onLessonToggle, completionMap = ne
                       key={lesson.id || lessonIdx}
                       lesson={lesson}
                       day={day.day}
+                      courseId={courseId}
                       index={lessonIdx}
                       isCompleted={isCompleted}
                       onToggleComplete={onLessonToggle}

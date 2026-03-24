@@ -58,7 +58,16 @@ Return JSON only:
           "description": "Brief description",
           "objectives": ["obj"],
           "timeMinutes": ${Math.floor(timePerDay / 2)},
-          "keywords": ["keyword1", "keyword2"]
+          "keywords": ["keyword1", "keyword2"],
+          "importance": "core",
+          "quiz": [
+            {
+              "question": "Quiz question about the lesson",
+              "options": ["A) Option 1", "B) Option 2", "C) Option 3", "D) Option 4"],
+              "correctAnswer": "A",
+              "explanation": "Brief explanation why A is correct"
+            }
+          ]
         }
       ]
     }
@@ -70,7 +79,9 @@ Requirements:
 - ~${timePerDay} minutes per day
 - 2-3 lessons per day
 - 3-4 modules total
-- Total time: ~${days * timePerDay} minutes`;
+- Total time: ~${days * timePerDay} minutes
+- importance: "core" (must learn), "important" (recommended), or "bonus" (optional enrichment)
+- quiz: 2-3 multiple choice questions per lesson to test understanding`;
 
       // Call Groq API with timeout (30 seconds - Groq is much faster!)
       const timeoutPromise = new Promise((_, reject) =>
@@ -195,6 +206,141 @@ Requirements:
         waitTime = 1000 * attempt;
         console.log(`⏳ Waiting ${waitTime/1000} seconds before retry ${attempt}/${maxRetries}...`);
       }
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+  }
+};
+
+/**
+ * Regenerate a single day in an existing course plan
+ *
+ * @param {object} existingPlan - The existing course plan
+ * @param {number} dayNumber - The day number to regenerate (1-indexed)
+ * @param {string} topic - Course topic
+ * @param {string} level - Skill level
+ * @param {number} timePerDay - Minutes per day
+ * @returns {object} Updated day content
+ */
+export const regenerateSingleDay = async (existingPlan, dayNumber, topic, level, timePerDay) => {
+  const maxRetries = 3;
+  let attempt = 0;
+
+  // Get module context if available
+  const dayToRegenerate = existingPlan.dailyPlan?.find(d => d.day === dayNumber);
+  const moduleId = dayToRegenerate?.moduleId;
+  const moduleInfo = existingPlan.modules?.find(m => m.id === moduleId);
+
+  while (attempt < maxRetries) {
+    try {
+      const prompt = `Regenerate day ${dayNumber} for "${topic}" course (${level} level, ${timePerDay} min/day).
+
+${moduleInfo ? `This day belongs to module: "${moduleInfo.title}" - ${moduleInfo.description}` : ''}
+
+Return JSON only for a SINGLE day:
+{
+  "day": ${dayNumber},
+  "moduleId": "${moduleId || 'm1'}",
+  "lessons": [
+    {
+      "id": "l1",
+      "title": "Lesson Title",
+      "description": "Brief description",
+      "objectives": ["obj1", "obj2"],
+      "timeMinutes": ${Math.floor(timePerDay / 2)},
+      "keywords": ["keyword1", "keyword2"],
+      "importance": "core",
+      "quiz": [
+        {
+          "question": "Quiz question",
+          "options": ["A) Option 1", "B) Option 2", "C) Option 3", "D) Option 4"],
+          "correctAnswer": "A",
+          "explanation": "Why A is correct"
+        }
+      ]
+    }
+  ]
+}
+
+Requirements:
+- 2-3 lessons for this day
+- Total ~${timePerDay} minutes
+- Mix of importance levels (core/important/bonus)
+- 2-3 quiz questions per lesson
+- Different content from the previous version`;
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Request timeout')), 30000)
+      );
+
+      const models = ['llama-3.1-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768'];
+      let response;
+      let lastError;
+
+      for (const model of models) {
+        try {
+          const apiPromise = groq.chat.completions.create({
+            model: model,
+            messages: [
+              {
+                role: 'system',
+                content: 'You are an expert educational course designer. Return valid JSON only, no markdown.',
+              },
+              {
+                role: 'user',
+                content: prompt,
+              },
+            ],
+            temperature: 0.8, // Higher temperature for more variety
+            max_tokens: 2000,
+          });
+
+          response = await Promise.race([apiPromise, timeoutPromise]);
+          console.log(`✅ Successfully used model: ${model} for day regeneration`);
+          break;
+        } catch (modelError) {
+          lastError = modelError;
+          if (modelError.message?.includes('decommissioned') || modelError.status === 400) {
+            console.log(`⚠️ Model ${model} not available, trying next...`);
+            continue;
+          } else {
+            throw modelError;
+          }
+        }
+      }
+
+      if (!response) {
+        throw lastError || new Error('All Groq models failed');
+      }
+
+      const content = response.choices[0]?.message?.content?.trim();
+      if (!content) {
+        throw new Error('Empty response from Groq');
+      }
+
+      // Remove markdown code blocks if present
+      let jsonString = content;
+      if (content.startsWith('```')) {
+        jsonString = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      }
+
+      const regeneratedDay = JSON.parse(jsonString);
+
+      // Validate structure
+      if (!regeneratedDay.lessons || !Array.isArray(regeneratedDay.lessons)) {
+        throw new Error('Invalid day structure');
+      }
+
+      return regeneratedDay;
+    } catch (error) {
+      attempt++;
+
+      console.error(`Day regeneration attempt ${attempt} failed:`, error.message);
+
+      if (attempt >= maxRetries) {
+        throw new AppError('Failed to regenerate day. Please try again.', 500);
+      }
+
+      const waitTime = 1000 * attempt;
       await new Promise(resolve => setTimeout(resolve, waitTime));
     }
   }

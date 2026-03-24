@@ -1,8 +1,42 @@
 import { motion } from 'framer-motion';
 import VideoCard from './VideoCard';
+import LessonQuiz from '../LessonQuiz';
+import LessonNotes from '../LessonNotes';
 
-const LessonCard = ({ lesson, day, index = 0, isCompleted = false, onToggleComplete }) => {
+const LessonCard = ({ lesson, day, courseId, index = 0, isCompleted = false, onToggleComplete }) => {
   if (!lesson) return null;
+
+  // Determine importance badge
+  const getImportanceBadge = () => {
+    const importance = lesson.importance || 'important';
+    const badges = {
+      core: {
+        bg: 'bg-red-100 dark:bg-red-900/30',
+        text: 'text-red-700 dark:text-red-300',
+        border: 'border-red-300 dark:border-red-700',
+        label: 'Core',
+        icon: '🔴',
+      },
+      important: {
+        bg: 'bg-yellow-100 dark:bg-yellow-900/30',
+        text: 'text-yellow-700 dark:text-yellow-300',
+        border: 'border-yellow-300 dark:border-yellow-700',
+        label: 'Important',
+        icon: '🟡',
+      },
+      bonus: {
+        bg: 'bg-blue-100 dark:bg-blue-900/30',
+        text: 'text-blue-700 dark:text-blue-300',
+        border: 'border-blue-300 dark:border-blue-700',
+        label: 'Bonus',
+        icon: '🔵',
+      },
+    };
+
+    return badges[importance] || badges.important;
+  };
+
+  const importanceBadge = getImportanceBadge();
   
   return (
     <motion.div
@@ -37,10 +71,20 @@ const LessonCard = ({ lesson, day, index = 0, isCompleted = false, onToggleCompl
           {/* Lesson Header */}
           <div className="flex items-start justify-between mb-3">
             <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <h4 className="text-lg font-bold text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
                   {lesson.title}
                 </h4>
+
+                {/* Importance badge */}
+                <span
+                  className={`px-2 py-0.5 rounded-md text-xs font-semibold border ${importanceBadge.bg} ${importanceBadge.text} ${importanceBadge.border} flex items-center gap-1`}
+                >
+                  <span>{importanceBadge.icon}</span>
+                  {importanceBadge.label}
+                </span>
+
+                {/* Time badge */}
                 <span className="px-2 py-1 rounded-lg text-xs font-semibold bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 flex items-center gap-1">
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -112,6 +156,22 @@ const LessonCard = ({ lesson, day, index = 0, isCompleted = false, onToggleCompl
                   <VideoCard key={video.id} video={video} index={vidIdx} />
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Quiz Section */}
+          {lesson.quiz && lesson.quiz.length > 0 && (
+            <LessonQuiz quiz={lesson.quiz} lessonTitle={lesson.title} />
+          )}
+
+          {/* Notes Section */}
+          {courseId && (
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-dark-border">
+              <LessonNotes
+                courseId={courseId}
+                day={day}
+                lessonId={lesson.id}
+              />
             </div>
           )}
 

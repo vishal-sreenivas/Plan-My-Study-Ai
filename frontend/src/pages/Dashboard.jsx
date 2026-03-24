@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { courseAPI } from '../services/api';
+import { courseAPI, activityAPI } from '../services/api';
 import toast from 'react-hot-toast';
 import Layout from '../components/Layout';
 import ProtectedRoute from '../components/ProtectedRoute';
@@ -10,14 +10,26 @@ import { CourseSkeleton } from '../components/SkeletonLoader';
 import AnimatedList from '../components/AnimatedList';
 import CourseProgressBar from '../components/CourseProgressBar';
 import CalendarHeatmap from '../components/CalendarHeatmap';
+import StreakCounter from '../components/StreakCounter';
 
 const Dashboard = () => {
   const [courses, setCourses] = useState([]);
+  const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchCourses();
+    fetchActivities();
   }, []);
+
+  const fetchActivities = async () => {
+    try {
+      const response = await activityAPI.getAll();
+      setActivities(response.data.data.activities || []);
+    } catch (error) {
+      console.error('Failed to fetch activities:', error);
+    }
+  };
 
   const fetchCourses = async () => {
     try {
@@ -79,8 +91,17 @@ const Dashboard = () => {
             </motion.div>
           </motion.div>
 
-          {/* Activity Calendar */}
-          {!loading && <CalendarHeatmap />}
+          {/* Streak Counter and Activity Calendar */}
+          {!loading && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+              <div className="lg:col-span-1">
+                <StreakCounter activities={activities} />
+              </div>
+              <div className="lg:col-span-2">
+                <CalendarHeatmap activities={activities} />
+              </div>
+            </div>
+          )}
 
           {/* Course Progress Bar */}
           {!loading && courses.length > 0 && (

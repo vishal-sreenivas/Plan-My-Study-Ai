@@ -6,8 +6,9 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
-import CreateCourse from './pages/CreateCourse';
+import MultiStepCreateCourse from './pages/MultiStepCreateCourse';
 import CourseDetail from './pages/CourseDetail';
+import SharedCourseViewer from './pages/SharedCourseViewer';
 
 function App() {
   const { user } = useAuth();
@@ -24,8 +25,9 @@ function App() {
         element={user ? <Navigate to="/dashboard" replace /> : <Register />}
       />
       <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/create" element={<CreateCourse />} />
+      <Route path="/create" element={<MultiStepCreateCourse />} />
       <Route path="/course/:id" element={<CourseDetail />} />
+      <Route path="/shared/:token" element={<SharedCourseViewer />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

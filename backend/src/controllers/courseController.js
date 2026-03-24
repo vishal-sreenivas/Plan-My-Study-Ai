@@ -2,7 +2,7 @@
 // Handles course generation, retrieval, and progress tracking
 
 import prisma from '../config/database.js';
-import { generateCoursePlan } from '../services/groqService.js';
+import { generateCoursePlan, regenerateSingleDay } from '../services/groqService.js';
 import { enrichCourseWithVideos } from '../services/youtubeService.js';
 import { AppError } from '../utils/errors.js';
 import { asyncHandler } from '../utils/errors.js';
@@ -121,6 +121,142 @@ export const generateCourse = asyncHandler(async (req, res, next) => {
     },
   });
 });
+
+/**
+ * Generate a new course with SSE progress updates
+ *
+ * Same as generateCourse but sends real-time progress via Server-Sent Events
+ * Events: start, plan-generating, plan-complete, video-fetching, video-complete, saving, complete, error
+ */
+export const generateCourseWithSSE = async (req, res) => {
+  // Set SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+
+  // Helper to send SSE event
+  const sendEvent = (type, data) => {
+    res.write(`data: ${JSON.stringify({ type, ...data })}\n\n`);
+  };
+
+  try {
+    const { topic, level, days, timePerDay } = req.body;
+    const userId = req.userId;
+
+    // Validate input
+    if (!topic || !level || !days || !timePerDay) {
+      sendEvent('error', { message: 'Topic, level, days, and timePerDay are required' });
+      return res.end();
+    }
+
+    const validLevels = ['beginner', 'intermediate', 'advanced'];
+    if (!validLevels.includes(level.toLowerCase())) {
+      sendEvent('error', { message: 'Level must be beginner, intermediate, or advanced' });
+      return res.end();
+    }
+
+    if (days < 1 || days > 365) {
+      sendEvent('error', { message: 'Days must be between 1 and 365' });
+      return res.end();
+    }
+
+    if (timePerDay < 15 || timePerDay > 480) {
+      sendEvent('error', { message: 'Time per day must be between 15 and 480 minutes' });
+      return res.end();
+    }
+
+    // Step 1: Start
+    sendEvent('start', { message: 'Starting course generation...' });
+
+    // Step 2: Generate course plan
+    sendEvent('plan-generating', { message: 'Creating your personalized study plan...' });
+
+    let coursePlan;
+    try {
+      coursePlan = await generateCoursePlan(topic, level, days, timePerDay);
+      sendEvent('plan-complete', {
+        message: 'Study plan created!',
+        days: coursePlan.dailyPlan?.length || days,
+        modules: coursePlan.modules?.length || 0,
+      });
+    } catch (error) {
+      sendEvent('error', { message: error.message || 'Failed to generate course plan' });
+      return res.end();
+    }
+
+    // Step 3: Enrich with YouTube videos
+    sendEvent('video-fetching', { message: 'Finding the best videos for each lesson...', day: 0, totalDays: days });
+
+    try {
+      // Video progress callback
+      const onVideoProgress = (progress) => {
+        sendEvent(progress.type, {
+          message: progress.message,
+          day: progress.day,
+          totalDays: progress.totalDays,
+        });
+      };
+
+      coursePlan = await Promise.race([
+        enrichCourseWithVideos(coursePlan, timePerDay, onVideoProgress),
+        new Promise((resolve) => setTimeout(() => resolve(coursePlan), 45000)), // 45s timeout
+      ]);
+
+      sendEvent('video-complete', { message: 'All videos found!' });
+    } catch (error) {
+      console.log('YouTube enrichment failed:', error.message);
+      sendEvent('video-complete', { message: 'Videos partially loaded' });
+    }
+
+    // Step 4: Save to database
+    sendEvent('saving', { message: 'Saving your course...' });
+
+    const course = await prisma.course.create({
+      data: {
+        userId,
+        topic,
+        level: level.toLowerCase(),
+        days,
+        timePerDay,
+        planJson: JSON.stringify(coursePlan),
+      },
+    });
+
+    // Log activity
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      await prisma.activityLog.upsert({
+        where: { userId_date: { userId, date: today } },
+        update: { count: { increment: 1 } },
+        create: { userId, date: today, count: 1 },
+      });
+    } catch (e) {
+      console.error('Failed to log activity:', e);
+    }
+
+    // Step 5: Complete
+    sendEvent('complete', {
+      message: 'Course created successfully!',
+      course: {
+        id: course.id,
+        topic: course.topic,
+        level: course.level,
+        days: course.days,
+        timePerDay: course.timePerDay,
+        plan: coursePlan,
+        createdAt: course.createdAt,
+      },
+    });
+
+    res.end();
+  } catch (error) {
+    console.error('SSE course generation error:', error);
+    sendEvent('error', { message: error.message || 'An unexpected error occurred' });
+    res.end();
+  }
+};
 
 /**
  * Get a specific course by ID
@@ -336,6 +472,243 @@ export const deleteCourse = asyncHandler(async (req, res, next) => {
   res.json({
     success: true,
     message: 'Course deleted successfully',
+  });
+});
+
+/**
+ * Regenerate a single day in a course
+ *
+ * Allows users to regenerate content for a specific day without redoing the entire course
+ */
+export const regenerateDay = asyncHandler(async (req, res, next) => {
+  const { id } = req.params; // Course ID
+  const { day } = req.body; // Day number to regenerate
+  const userId = req.userId;
+
+  // Validate input
+  if (!day || day < 1) {
+    throw new AppError('Valid day number is required', 400);
+  }
+
+  // Get the course
+  const course = await prisma.course.findFirst({
+    where: {
+      id,
+      userId,
+    },
+  });
+
+  if (!course) {
+    throw new AppError('Course not found', 404);
+  }
+
+  // Parse the existing plan
+  const existingPlan = JSON.parse(course.planJson);
+
+  // Validate day exists
+  if (!existingPlan.dailyPlan || day > existingPlan.dailyPlan.length) {
+    throw new AppError('Invalid day number for this course', 400);
+  }
+
+  // Regenerate the specific day
+  const regeneratedDay = await regenerateSingleDay(
+    existingPlan,
+    day,
+    course.topic,
+    course.level,
+    course.timePerDay
+  );
+
+  // Enrich with YouTube videos
+  let enrichedDay = regeneratedDay;
+  try {
+    const tempPlan = {
+      ...existingPlan,
+      dailyPlan: [regeneratedDay],
+    };
+
+    const enrichedPlan = await Promise.race([
+      enrichCourseWithVideos(tempPlan, course.timePerDay),
+      new Promise((resolve) => setTimeout(() => resolve(tempPlan), 15000)), // 15s timeout
+    ]);
+
+    enrichedDay = enrichedPlan.dailyPlan[0];
+  } catch (error) {
+    console.log('YouTube enrichment skipped for regenerated day:', error.message);
+  }
+
+  // Update the course plan
+  const updatedDailyPlan = existingPlan.dailyPlan.map((d) =>
+    d.day === day ? enrichedDay : d
+  );
+
+  const updatedPlan = {
+    ...existingPlan,
+    dailyPlan: updatedDailyPlan,
+  };
+
+  // Save updated plan
+  await prisma.course.update({
+    where: { id },
+    data: {
+      planJson: JSON.stringify(updatedPlan),
+    },
+  });
+
+  res.json({
+    success: true,
+    message: `Day ${day} regenerated successfully`,
+    data: {
+      day: enrichedDay,
+    },
+  });
+});
+
+/**
+ * Generate or update share token for course
+ * POST /api/course/:id/share
+ */
+export const shareCourse = asyncHandler(async (req, res, next) => {
+  const { id } = req.params;
+  const { isPublic } = req.body;
+  const userId = req.userId;
+
+  // Validate input
+  if (typeof isPublic !== 'boolean') {
+    throw new AppError('isPublic must be a boolean value', 400);
+  }
+
+  // Verify course ownership
+  const course = await prisma.course.findFirst({
+    where: {
+      id,
+      userId,
+    },
+  });
+
+  if (!course) {
+    throw new AppError('Course not found', 404);
+  }
+
+  let updateData = {
+    isPublic,
+  };
+
+  // Generate share token if making public or if no token exists
+  if (isPublic && !course.shareToken) {
+    // Generate a unique share token (8 character string)
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let shareToken = '';
+    for (let i = 0; i < 8; i++) {
+      shareToken += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    updateData.shareToken = shareToken;
+  }
+
+  // If making private, keep the token but set isPublic to false
+  // This allows the user to re-enable sharing with the same link
+
+  const updatedCourse = await prisma.course.update({
+    where: { id },
+    data: updateData,
+  });
+
+  res.json({
+    success: true,
+    data: {
+      isPublic: updatedCourse.isPublic,
+      shareToken: updatedCourse.shareToken,
+      shareUrl: updatedCourse.isPublic && updatedCourse.shareToken
+        ? `${process.env.FRONTEND_URL || 'http://localhost:5173'}/shared/${updatedCourse.shareToken}`
+        : null,
+    },
+  });
+});
+
+/**
+ * Get shared course by token (public access)
+ * GET /api/course/shared/:token
+ */
+export const getSharedCourse = asyncHandler(async (req, res, next) => {
+  const { token } = req.params;
+
+  if (!token) {
+    throw new AppError('Share token is required', 400);
+  }
+
+  // Find course by share token
+  const course = await prisma.course.findFirst({
+    where: {
+      shareToken: token,
+      isPublic: true, // Only return if course is public
+    },
+    include: {
+      user: {
+        select: {
+          name: true, // Only include creator name
+        },
+      },
+    },
+  });
+
+  if (!course) {
+    throw new AppError('Shared course not found or no longer available', 404);
+  }
+
+  // Parse course plan
+  const plan = JSON.parse(course.planJson);
+
+  res.json({
+    success: true,
+    data: {
+      course: {
+        id: course.id,
+        topic: course.topic,
+        level: course.level,
+        days: course.days,
+        timePerDay: course.timePerDay,
+        plan,
+        createdAt: course.createdAt,
+        creator: course.user.name,
+        isShared: true, // Flag to indicate this is a shared course
+      },
+    },
+  });
+});
+
+/**
+ * Get sharing status for a course
+ * GET /api/course/:id/sharing
+ */
+export const getSharingStatus = asyncHandler(async (req, res, next) => {
+  const { id } = req.params;
+  const userId = req.userId;
+
+  // Verify course ownership
+  const course = await prisma.course.findFirst({
+    where: {
+      id,
+      userId,
+    },
+    select: {
+      isPublic: true,
+      shareToken: true,
+    },
+  });
+
+  if (!course) {
+    throw new AppError('Course not found', 404);
+  }
+
+  res.json({
+    success: true,
+    data: {
+      isPublic: course.isPublic,
+      shareToken: course.shareToken,
+      shareUrl: course.isPublic && course.shareToken
+        ? `${process.env.FRONTEND_URL || 'http://localhost:5173'}/shared/${course.shareToken}`
+        : null,
+    },
   });
 });
 

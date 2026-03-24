@@ -49,8 +49,8 @@ export default {
           '100%': { boxShadow: '0 0 20px rgba(14, 165, 233, 0.8)' },
         },
         shimmer: {
-          '0%': { backgroundPosition: '-1000px 0' },
-          '100%': { backgroundPosition: '1000px 0' },
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(100%)' },
         },
       },
       backdropBlur: {
