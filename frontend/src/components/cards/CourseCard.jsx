@@ -31,10 +31,15 @@ const CourseCard = ({ course, index = 0, onDelete }) => {
     e.stopPropagation();
     if (onDelete) {
       setIsDeleting(true);
-      await onDelete(course.id);
-      setIsDeleting(false);
+      try {
+        const success = await onDelete(course.id);
+        if (success) {
+          setShowDeleteConfirm(false);
+        }
+      } finally {
+        setIsDeleting(false);
+      }
     }
-    setShowDeleteConfirm(false);
   };
 
   const handleCancelDelete = (e) => {

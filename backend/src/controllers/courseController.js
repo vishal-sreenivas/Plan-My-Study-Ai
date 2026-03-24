@@ -310,7 +310,7 @@ export const updateProgress = asyncHandler(async (req, res, next) => {
 /**
  * Delete a course
  *
- * Deletes a course and all associated progress records
+ * Deletes a course and all associated progress records (via cascade)
  */
 export const deleteCourse = asyncHandler(async (req, res, next) => {
   const { id } = req.params;
@@ -328,12 +328,7 @@ export const deleteCourse = asyncHandler(async (req, res, next) => {
     throw new AppError('Course not found', 404);
   }
 
-  // Delete progress records first (due to foreign key constraint)
-  await prisma.progress.deleteMany({
-    where: { courseId: id },
-  });
-
-  // Delete the course
+  // Delete the course (progress records are deleted via cascade)
   await prisma.course.delete({
     where: { id },
   });

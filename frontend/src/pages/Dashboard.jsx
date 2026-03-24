@@ -35,9 +35,11 @@ const Dashboard = () => {
       await courseAPI.delete(courseId);
       setCourses(courses.filter(course => course.id !== courseId));
       toast.success('Course deleted successfully');
+      return true;
     } catch (error) {
-      toast.error('Failed to delete course');
-      throw error;
+      console.error('Delete course error:', error);
+      toast.error(error.response?.data?.message || 'Failed to delete course');
+      return false;
     }
   };
 
