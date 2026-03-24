@@ -44,11 +44,11 @@ export const generateCourse = asyncHandler(async (req, res, next) => {
   // Generate course plan using AI
   let coursePlan = await generateCoursePlan(topic, level, days, timePerDay);
 
-  // Enrich with YouTube videos (non-blocking - don't wait if it fails)
+  // Enrich with YouTube videos (respects time budget)
   try {
     coursePlan = await Promise.race([
-      enrichCourseWithVideos(coursePlan),
-      new Promise((resolve) => setTimeout(() => resolve(coursePlan), 10000)), // 10s timeout for videos
+      enrichCourseWithVideos(coursePlan, timePerDay),
+      new Promise((resolve) => setTimeout(() => resolve(coursePlan), 30000)), // 30s timeout for videos
     ]);
   } catch (error) {
     console.log('YouTube enrichment skipped:', error.message);
@@ -304,6 +304,43 @@ export const updateProgress = asyncHandler(async (req, res, next) => {
     data: {
       progress,
     },
+  });
+});
+
+/**
+ * Delete a course
+ *
+ * Deletes a course and all associated progress records
+ */
+export const deleteCourse = asyncHandler(async (req, res, next) => {
+  const { id } = req.params;
+  const userId = req.userId;
+
+  // Verify course ownership
+  const course = await prisma.course.findFirst({
+    where: {
+      id,
+      userId,
+    },
+  });
+
+  if (!course) {
+    throw new AppError('Course not found', 404);
+  }
+
+  // Delete progress records first (due to foreign key constraint)
+  await prisma.progress.deleteMany({
+    where: { courseId: id },
+  });
+
+  // Delete the course
+  await prisma.course.delete({
+    where: { id },
+  });
+
+  res.json({
+    success: true,
+    message: 'Course deleted successfully',
   });
 });
 

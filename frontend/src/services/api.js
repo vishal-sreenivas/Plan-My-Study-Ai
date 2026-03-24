@@ -53,6 +53,7 @@ export const courseAPI = {
   getAll: () => api.get('/api/course'),
   getById: (id) => api.get(`/api/course/${id}`),
   updateProgress: (data) => api.put('/api/course/progress', data),
+  delete: (id) => api.delete(`/api/course/${id}`),
 };
 
 // Activity API

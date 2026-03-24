@@ -30,6 +30,17 @@ const Dashboard = () => {
     }
   };
 
+  const handleDeleteCourse = async (courseId) => {
+    try {
+      await courseAPI.delete(courseId);
+      setCourses(courses.filter(course => course.id !== courseId));
+      toast.success('Course deleted successfully');
+    } catch (error) {
+      toast.error('Failed to delete course');
+      throw error;
+    }
+  };
+
   return (
     <ProtectedRoute>
       <Layout>
@@ -126,7 +137,12 @@ const Dashboard = () => {
           ) : (
             <AnimatedList className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {courses.map((course, index) => (
-                <CourseCard key={course.id} course={course} index={index} />
+                <CourseCard
+                  key={course.id}
+                  course={course}
+                  index={index}
+                  onDelete={handleDeleteCourse}
+                />
               ))}
             </AnimatedList>
           )}

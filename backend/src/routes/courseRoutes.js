@@ -8,6 +8,7 @@ import {
   getCourse,
   getUserCourses,
   updateProgress,
+  deleteCourse,
 } from '../controllers/courseController.js';
 
 const router = express.Router();
@@ -26,6 +27,9 @@ router.get('/:id', getCourse);
 
 // PUT /api/course/progress - Update lesson progress
 router.put('/progress', updateProgress);
+
+// DELETE /api/course/:id - Delete a course
+router.delete('/:id', deleteCourse);
 
 export default router;
 
