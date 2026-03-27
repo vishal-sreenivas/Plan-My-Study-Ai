@@ -34,10 +34,10 @@ export const generateCoursePlan = async (topic, level, days, timePerDay) => {
 
   while (attempt < maxRetries) {
     try {
-      // Optimized prompt - shorter and more focused for faster generation
+      // Optimized prompt with day-level quizzes (4-5 per day)
       const prompt = `Create a ${days}-day study plan for "${topic}" (${level} level, ${timePerDay} min/day).
 
-Return JSON only:
+Return JSON only (no markdown):
 {
   "overview": {
     "title": "Course Title",
@@ -56,32 +56,31 @@ Return JSON only:
           "id": "l1",
           "title": "Lesson Title",
           "description": "Brief description",
-          "objectives": ["obj"],
+          "objectives": ["learning objective"],
           "timeMinutes": ${Math.floor(timePerDay / 2)},
           "keywords": ["keyword1", "keyword2"],
-          "importance": "core",
-          "quiz": [
-            {
-              "question": "Quiz question about the lesson",
-              "options": ["A) Option 1", "B) Option 2", "C) Option 3", "D) Option 4"],
-              "correctAnswer": "A",
-              "explanation": "Brief explanation why A is correct"
-            }
-          ]
+          "importance": "core"
+        }
+      ],
+      "quizzes": [
+        {
+          "question": "Question testing understanding of this day's lessons",
+          "options": ["A) First option", "B) Second option", "C) Third option", "D) Fourth option"],
+          "correctAnswer": "A",
+          "explanation": "Why A is correct based on the lesson content"
         }
       ]
     }
   ]
 }
 
-Requirements:
-- ${days} days total
-- ~${timePerDay} minutes per day
-- 2-3 lessons per day
-- 3-4 modules total
-- Total time: ~${days * timePerDay} minutes
-- importance: "core" (must learn), "important" (recommended), or "bonus" (optional enrichment)
-- quiz: 2-3 multiple choice questions per lesson to test understanding`;
+STRICT Requirements:
+- Exactly ${days} days in dailyPlan array
+- 2-3 lessons per day, ~${timePerDay} min total per day
+- importance: "core", "important", or "bonus"
+- EXACTLY 4-5 quizzes per day (at day level, NOT inside lessons)
+- Each quiz tests understanding of THAT DAY's specific lessons
+- Each quiz has: question, options (4 choices with A/B/C/D prefix), correctAnswer (A/B/C/D), explanation`;
 
       // Call Groq API with timeout (30 seconds - Groq is much faster!)
       const timeoutPromise = new Promise((_, reject) =>
@@ -155,6 +154,36 @@ Requirements:
       if (coursePlan.dailyPlan.length !== days) {
         throw new Error(`Daily plan has ${coursePlan.dailyPlan.length} days, expected ${days}`);
       }
+
+      // QUIZ VALIDATION: Ensure exactly 4-5 quizzes per day with correct structure
+      const quizValidationErrors = [];
+      coursePlan.dailyPlan.forEach((day, index) => {
+        const dayNum = day.day || index + 1;
+
+        if (!day.quizzes || !Array.isArray(day.quizzes)) {
+          quizValidationErrors.push(`Day ${dayNum}: Missing quizzes array`);
+        } else if (day.quizzes.length < 4 || day.quizzes.length > 5) {
+          quizValidationErrors.push(`Day ${dayNum}: Has ${day.quizzes.length} quizzes, expected 4-5`);
+        } else {
+          // Validate each quiz structure
+          day.quizzes.forEach((quiz, qIndex) => {
+            if (!quiz.question || !quiz.options || !quiz.correctAnswer || !quiz.explanation) {
+              quizValidationErrors.push(`Day ${dayNum}, Quiz ${qIndex + 1}: Missing required fields`);
+            } else if (!Array.isArray(quiz.options) || quiz.options.length !== 4) {
+              quizValidationErrors.push(`Day ${dayNum}, Quiz ${qIndex + 1}: Must have exactly 4 options`);
+            } else if (!['A', 'B', 'C', 'D'].includes(quiz.correctAnswer)) {
+              quizValidationErrors.push(`Day ${dayNum}, Quiz ${qIndex + 1}: correctAnswer must be A, B, C, or D`);
+            }
+          });
+        }
+      });
+
+      if (quizValidationErrors.length > 0) {
+        console.warn('Quiz validation issues:', quizValidationErrors);
+        throw new Error(`Quiz validation failed: ${quizValidationErrors.slice(0, 3).join('; ')}`);
+      }
+
+      console.log(`✅ Course plan validated: ${coursePlan.dailyPlan.length} days, ${coursePlan.dailyPlan.reduce((sum, d) => sum + (d.quizzes?.length || 0), 0)} total quizzes`);
 
       return coursePlan;
     } catch (error) {

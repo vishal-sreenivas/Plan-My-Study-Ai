@@ -1,0 +1,30 @@
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {2.1}{\ignorespaces PlanMyStudy AI --- Three-Tier System Architecture}}{10}{figure.caption.3}%
+\contentsline {figure}{\numberline {2.2}{\ignorespaces End-to-End Data Flow for Course Generation}}{13}{figure.caption.4}%
+\contentsline {figure}{\numberline {2.3}{\ignorespaces Authentication Flow --- Registration and Login}}{14}{figure.caption.5}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {5.1}{\ignorespaces Entity--Relationship Diagram for PlanMyStudy AI}}{24}{figure.caption.9}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {6.1}{\ignorespaces PlanMyStudy AI --- Landing Page with Hero Section and Call-to-Action Buttons}}{29}{figure.caption.10}%
+\contentsline {figure}{\numberline {6.2}{\ignorespaces Dashboard Page Wireframe --- Activity Heatmap, Streak Counter, and Course Cards}}{30}{figure.caption.11}%
+\contentsline {figure}{\numberline {6.3}{\ignorespaces Dashboard Page --- Streak Counter, Activity Calendar, Progress Statistics, and Course Cards}}{31}{figure.caption.12}%
+\contentsline {figure}{\numberline {6.4}{\ignorespaces Step 1 --- Topic Selection}}{31}{figure.caption.13}%
+\contentsline {figure}{\numberline {6.5}{\ignorespaces Step 2 --- Level Selection}}{31}{figure.caption.13}%
+\contentsline {figure}{\numberline {6.6}{\ignorespaces Step 3 --- Time Commitment}}{31}{figure.caption.13}%
+\contentsline {figure}{\numberline {6.7}{\ignorespaces Step 4 --- Review \& Generate}}{31}{figure.caption.13}%
+\contentsline {figure}{\numberline {6.8}{\ignorespaces CreateCourse 4-Step Wizard --- Complete Course Generation Flow}}{31}{figure.caption.13}%
+\contentsline {figure}{\numberline {6.9}{\ignorespaces Course Detail --- Header with Title, Level Badge, Progress Bar, Share and Export Buttons, and Learning Objectives}}{32}{figure.caption.14}%
+\contentsline {figure}{\numberline {6.10}{\ignorespaces Course Detail --- Module Cards Showing Module Number, Title, Description, and Learning Goals}}{32}{figure.caption.15}%
+\contentsline {figure}{\numberline {6.11}{\ignorespaces Course Detail --- Daily Study Plan with Day Tabs, Lesson Card, YouTube Video Resource, Quiz Prompt, Notes, and Mark as Complete Button}}{33}{figure.caption.16}%
+\contentsline {figure}{\numberline {6.12}{\ignorespaces CourseDetail Page Wireframe --- Day Tabs, Lesson Cards, Quiz, and Notes}}{33}{figure.caption.17}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {7.1}{\ignorespaces Course Generation Timing Breakdown --- Average Duration per Phase (7-day course)}}{38}{figure.caption.21}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }

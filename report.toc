@@ -1,0 +1,115 @@
+\contentsline {chapter}{Abstract}{1}{chapter*.1}%
+\contentsline {chapter}{\numberline {1}Introduction}{7}{chapter.1}%
+\contentsline {section}{\numberline {1.1}Problem Statement}{7}{section.1.1}%
+\contentsline {section}{\numberline {1.2}Objectives}{7}{section.1.2}%
+\contentsline {section}{\numberline {1.3}Scope}{8}{section.1.3}%
+\contentsline {section}{\numberline {1.4}Technology Stack}{9}{section.1.4}%
+\contentsline {chapter}{\numberline {2}System Architecture}{10}{chapter.2}%
+\contentsline {section}{\numberline {2.1}Architectural Overview}{10}{section.2.1}%
+\contentsline {subsection}{\numberline {2.1.1}Tier 1 — Presentation Layer (Frontend)}{10}{subsection.2.1.1}%
+\contentsline {subsection}{\numberline {2.1.2}Tier 2 — Application Layer (Backend)}{11}{subsection.2.1.2}%
+\contentsline {subsection}{\numberline {2.1.3}Tier 3 — Data \& External Services Layer}{11}{subsection.2.1.3}%
+\contentsline {section}{\numberline {2.2}Project Structure}{11}{section.2.2}%
+\contentsline {subsection}{\numberline {2.2.1}Backend Directory Layout}{11}{subsection.2.2.1}%
+\contentsline {subsection}{\numberline {2.2.2}Frontend Directory Layout}{12}{subsection.2.2.2}%
+\contentsline {section}{\numberline {2.3}Data Flow — Course Generation}{13}{section.2.3}%
+\contentsline {section}{\numberline {2.4}Authentication Flow}{14}{section.2.4}%
+\contentsline {subsection}{\numberline {2.4.1}JWT Token Lifecycle}{14}{subsection.2.4.1}%
+\contentsline {section}{\numberline {2.5}API Endpoint Reference}{15}{section.2.5}%
+\contentsline {chapter}{\numberline {3}Data Ingestion — AI Course Generation}{16}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Overview}{16}{section.3.1}%
+\contentsline {section}{\numberline {3.2}Groq AI Integration}{16}{section.3.2}%
+\contentsline {subsection}{\numberline {3.2.1}Prompt Engineering}{16}{subsection.3.2.1}%
+\contentsline {section}{\numberline {3.3}YouTube Video Enrichment}{19}{section.3.3}%
+\contentsline {subsection}{\numberline {3.3.1}Parallel Fetching Strategy}{19}{subsection.3.3.1}%
+\contentsline {chapter}{\numberline {4}Data Transformation — Backend Service Layer}{20}{chapter.4}%
+\contentsline {section}{\numberline {4.1}Overview}{20}{section.4.1}%
+\contentsline {section}{\numberline {4.2}AI Response Parsing and Validation}{20}{section.4.2}%
+\contentsline {section}{\numberline {4.3}Retry Logic with Exponential Backoff}{21}{section.4.3}%
+\contentsline {section}{\numberline {4.4}ISO 8601 Duration Parsing}{21}{section.4.4}%
+\contentsline {section}{\numberline {4.5}Time-Budget Allocation Algorithm}{22}{section.4.5}%
+\contentsline {subsection}{\numberline {4.5.1}Video Filtering}{22}{subsection.4.5.1}%
+\contentsline {subsection}{\numberline {4.5.2}Relevance Scoring}{22}{subsection.4.5.2}%
+\contentsline {subsection}{\numberline {4.5.3}Budget-Aware Selection}{22}{subsection.4.5.3}%
+\contentsline {chapter}{\numberline {5}Data Modelling}{24}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Entity--Relationship Overview}{24}{section.5.1}%
+\contentsline {section}{\numberline {5.2}Prisma Schema}{25}{section.5.2}%
+\contentsline {section}{\numberline {5.3}Model Descriptions}{27}{section.5.3}%
+\contentsline {subsection}{\numberline {5.3.1}User Model}{27}{subsection.5.3.1}%
+\contentsline {subsection}{\numberline {5.3.2}Course Model}{27}{subsection.5.3.2}%
+\contentsline {subsection}{\numberline {5.3.3}Progress Model}{27}{subsection.5.3.3}%
+\contentsline {subsection}{\numberline {5.3.4}ActivityLog Model}{27}{subsection.5.3.4}%
+\contentsline {subsection}{\numberline {5.3.5}Note Model}{27}{subsection.5.3.5}%
+\contentsline {section}{\numberline {5.4}Why JSON for Course Plans?}{28}{section.5.4}%
+\contentsline {chapter}{\numberline {6}Frontend \& Dashboard}{29}{chapter.6}%
+\contentsline {section}{\numberline {6.1}Overview}{29}{section.6.1}%
+\contentsline {section}{\numberline {6.2}Landing Page}{29}{section.6.2}%
+\contentsline {section}{\numberline {6.3}Dashboard Page}{29}{section.6.3}%
+\contentsline {section}{\numberline {6.4}CreateCourse Wizard}{31}{section.6.4}%
+\contentsline {subsection}{\numberline {6.4.1}Step 1 --- Topic Selection (Figure~\ref {fig:wizard-step1})}{31}{subsection.6.4.1}%
+\contentsline {subsection}{\numberline {6.4.2}Step 2 --- Level Selection (Figure~\ref {fig:wizard-step2})}{31}{subsection.6.4.2}%
+\contentsline {subsection}{\numberline {6.4.3}Step 3 --- Time Commitment (Figure~\ref {fig:wizard-step3})}{31}{subsection.6.4.3}%
+\contentsline {subsection}{\numberline {6.4.4}Step 4 --- Review \& Generate (Figure~\ref {fig:wizard-step4})}{32}{subsection.6.4.4}%
+\contentsline {section}{\numberline {6.5}CourseDetail Page}{32}{section.6.5}%
+\contentsline {subsection}{\numberline {6.5.1}Day Tabs}{33}{subsection.6.5.1}%
+\contentsline {subsection}{\numberline {6.5.2}Lesson Cards}{33}{subsection.6.5.2}%
+\contentsline {subsection}{\numberline {6.5.3}Video Embed Modal}{34}{subsection.6.5.3}%
+\contentsline {subsection}{\numberline {6.5.4}Quiz Section}{34}{subsection.6.5.4}%
+\contentsline {subsection}{\numberline {6.5.5}Notes}{34}{subsection.6.5.5}%
+\contentsline {subsection}{\numberline {6.5.6}Day Regeneration}{34}{subsection.6.5.6}%
+\contentsline {subsection}{\numberline {6.5.7}Progress Tracking}{35}{subsection.6.5.7}%
+\contentsline {subsection}{\numberline {6.5.8}PDF Export}{35}{subsection.6.5.8}%
+\contentsline {subsection}{\numberline {6.5.9}Course Sharing}{35}{subsection.6.5.9}%
+\contentsline {section}{\numberline {6.6}Component Architecture}{36}{section.6.6}%
+\contentsline {section}{\numberline {6.7}API Integration Layer}{36}{section.6.7}%
+\contentsline {chapter}{\numberline {7}Performance Analysis}{37}{chapter.7}%
+\contentsline {section}{\numberline {7.1}API Response Time Breakdown}{37}{section.7.1}%
+\contentsline {section}{\numberline {7.2}Parallel vs.\ Sequential YouTube Fetching}{37}{section.7.2}%
+\contentsline {section}{\numberline {7.3}Groq vs.\ OpenAI Inference Speed}{38}{section.7.3}%
+\contentsline {section}{\numberline {7.4}Database Performance}{39}{section.7.4}%
+\contentsline {subsection}{\numberline {7.4.1}Indexing Strategy}{39}{subsection.7.4.1}%
+\contentsline {subsection}{\numberline {7.4.2}Query Performance}{39}{subsection.7.4.2}%
+\contentsline {subsection}{\numberline {7.4.3}Connection Management}{39}{subsection.7.4.3}%
+\contentsline {section}{\numberline {7.5}Frontend Performance}{40}{section.7.5}%
+\contentsline {subsection}{\numberline {7.5.1}Build Optimization}{40}{subsection.7.5.1}%
+\contentsline {subsection}{\numberline {7.5.2}Runtime Optimization}{40}{subsection.7.5.2}%
+\contentsline {subsection}{\numberline {7.5.3}Render Performance}{40}{subsection.7.5.3}%
+\contentsline {section}{\numberline {7.6}Scalability Considerations}{41}{section.7.6}%
+\contentsline {chapter}{\numberline {8}Challenges \& Solutions}{42}{chapter.8}%
+\contentsline {section}{\numberline {8.1}AI JSON Malformation}{42}{section.8.1}%
+\contentsline {section}{\numberline {8.2}AI Model Decommissioning}{42}{section.8.2}%
+\contentsline {section}{\numberline {8.3}YouTube API Quota Limits}{42}{section.8.3}%
+\contentsline {section}{\numberline {8.4}Time-Budget Constraint Algorithm}{43}{section.8.4}%
+\contentsline {section}{\numberline {8.5}JWT Security Considerations}{43}{section.8.5}%
+\contentsline {section}{\numberline {8.6}Server-Sent Events (SSE) Reliability}{44}{section.8.6}%
+\contentsline {section}{\numberline {8.7}Cross-Origin Resource Sharing (CORS)}{44}{section.8.7}%
+\contentsline {section}{\numberline {8.8}Handling Large AI Responses}{44}{section.8.8}%
+\contentsline {chapter}{\numberline {9}Security \& Testing}{46}{chapter.9}%
+\contentsline {section}{\numberline {9.1}Security Architecture}{46}{section.9.1}%
+\contentsline {subsection}{\numberline {9.1.1}Authentication Security}{46}{subsection.9.1.1}%
+\contentsline {subsection}{\numberline {9.1.2}Input Validation}{46}{subsection.9.1.2}%
+\contentsline {subsection}{\numberline {9.1.3}SQL Injection Prevention}{47}{subsection.9.1.3}%
+\contentsline {subsection}{\numberline {9.1.4}Cross-Site Scripting (XSS) Prevention}{47}{subsection.9.1.4}%
+\contentsline {subsection}{\numberline {9.1.5}Rate Limiting \& Error Handling}{47}{subsection.9.1.5}%
+\contentsline {section}{\numberline {9.2}Testing Strategy}{48}{section.9.2}%
+\contentsline {subsection}{\numberline {9.2.1}API Testing}{48}{subsection.9.2.1}%
+\contentsline {subsection}{\numberline {9.2.2}Frontend Testing}{48}{subsection.9.2.2}%
+\contentsline {subsection}{\numberline {9.2.3}AI Output Validation Testing}{48}{subsection.9.2.3}%
+\contentsline {subsection}{\numberline {9.2.4}Error Recovery Testing}{49}{subsection.9.2.4}%
+\contentsline {chapter}{\numberline {10}Conclusion}{50}{chapter.10}%
+\contentsline {section}{\numberline {10.1}Summary}{50}{section.10.1}%
+\contentsline {section}{\numberline {10.2}Key Technical Achievements}{50}{section.10.2}%
+\contentsline {section}{\numberline {10.3}Lessons Learned}{51}{section.10.3}%
+\contentsline {section}{\numberline {10.4}Comparison with Existing Platforms}{51}{section.10.4}%
+\contentsline {section}{\numberline {10.5}Future Scope}{52}{section.10.5}%
+\contentsline {chapter}{\numberline {A}Backend Code Listings}{54}{appendix.A}%
+\contentsline {section}{\numberline {A.1}Authentication Controller (authController.js)}{54}{section.A.1}%
+\contentsline {section}{\numberline {A.2}JWT Utilities (jwt.js)}{55}{section.A.2}%
+\contentsline {section}{\numberline {A.3}Authentication Middleware (auth.js)}{56}{section.A.3}%
+\contentsline {section}{\numberline {A.4}Course Controller — Generate Course (excerpt)}{56}{section.A.4}%
+\contentsline {chapter}{\numberline {B}Sample API Payloads}{58}{appendix.B}%
+\contentsline {section}{\numberline {B.1}AI Course Generation Request}{58}{section.B.1}%
+\contentsline {section}{\numberline {B.2}AI Course Generation Response (Excerpt)}{58}{section.B.2}%
+\contentsline {section}{\numberline {B.3}YouTube API Response (Excerpt)}{59}{section.B.3}%
+\contentsline {chapter}{\numberline {C}Glossary}{61}{appendix.C}%
+\contentsline {chapter}{References}{63}{appendix*.28}%

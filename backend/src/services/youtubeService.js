@@ -182,7 +182,107 @@ const searchVideosWithDuration = async (query, maxResults = 10) => {
 };
 
 /**
- * Select the best video for a lesson within time budget
+ * Select optimal combination of 2-3 videos for a day within time budget
+ *
+ * Strategy:
+ * 1. Pool all candidate videos from all lessons
+ * 2. Filter out blacklisted and too-short videos
+ * 3. Score by relevance
+ * 4. Find best combination of 2-3 videos that fits the time budget
+ * 5. Prefer fewer high-quality videos over many short ones
+ * 6. If no combination fits, pick single shortest relevant video with durationWarning
+ *
+ * @param {Array} lessonVideoResults - Array of {lesson, videos} objects
+ * @param {number} dailyBudgetSeconds - Total time budget for the day in seconds
+ * @returns {Array} Selected videos with lesson associations
+ */
+const selectDayVideos = (lessonVideoResults, dailyBudgetSeconds) => {
+  const budgetWithBuffer = dailyBudgetSeconds + (TIME_BUFFER_MINUTES * 60);
+  const allCandidates = [];
+
+  // Step 1: Pool and score all candidates from all lessons
+  for (const { lesson, videos } of lessonVideoResults) {
+    if (!videos || videos.length === 0) continue;
+
+    const lessonMaxSeconds = (lesson.timeMinutes || 10) * 60 * MAX_VIDEO_DURATION_MULTIPLIER;
+    const keywords = lesson.keywords || [lesson.title];
+
+    for (const video of videos) {
+      // Skip blacklisted videos
+      if (isBlacklistedVideo(video.title)) continue;
+      // Skip too short videos
+      if (video.durationSeconds < MIN_VIDEO_DURATION_SECONDS) continue;
+      // Skip way too long videos
+      if (video.durationSeconds > lessonMaxSeconds) continue;
+
+      const relevanceScore = calculateRelevanceScore(video, keywords, lesson.title);
+      allCandidates.push({
+        ...video,
+        lessonId: lesson.id,
+        lessonTitle: lesson.title,
+        relevanceScore,
+      });
+    }
+  }
+
+  if (allCandidates.length === 0) {
+    return [];
+  }
+
+  // Sort by relevance score (highest first)
+  allCandidates.sort((a, b) => b.relevanceScore - a.relevanceScore);
+
+  // Step 2: Try to find best combination of 2-3 videos within budget
+  // Start with top 10 candidates for efficiency
+  const topCandidates = allCandidates.slice(0, 10);
+
+  // Try 2 videos first (preferred)
+  for (let i = 0; i < Math.min(topCandidates.length, 8); i++) {
+    for (let j = i + 1; j < Math.min(topCandidates.length, 10); j++) {
+      const combo = [topCandidates[i], topCandidates[j]];
+      const totalDuration = combo.reduce((sum, v) => sum + v.durationSeconds, 0);
+      if (totalDuration <= budgetWithBuffer && totalDuration >= dailyBudgetSeconds * 0.5) {
+        // Good fit: covers at least 50% of budget and doesn't exceed it
+        return combo.map(v => ({ ...v, withinBudget: true, durationWarning: false }));
+      }
+    }
+  }
+
+  // Try 3 videos if 2 doesn't fit well
+  for (let i = 0; i < Math.min(topCandidates.length, 6); i++) {
+    for (let j = i + 1; j < Math.min(topCandidates.length, 8); j++) {
+      for (let k = j + 1; k < Math.min(topCandidates.length, 10); k++) {
+        const combo = [topCandidates[i], topCandidates[j], topCandidates[k]];
+        const totalDuration = combo.reduce((sum, v) => sum + v.durationSeconds, 0);
+        if (totalDuration <= budgetWithBuffer) {
+          return combo.map(v => ({ ...v, withinBudget: true, durationWarning: false }));
+        }
+      }
+    }
+  }
+
+  // Try single best video that fits
+  for (const video of topCandidates) {
+    if (video.durationSeconds <= budgetWithBuffer) {
+      return [{ ...video, withinBudget: true, durationWarning: false }];
+    }
+  }
+
+  // Fallback: No combination fits, pick shortest relevant video with warning
+  const shortestVideo = allCandidates.reduce((shortest, current) =>
+    current.durationSeconds < shortest.durationSeconds ? current : shortest
+  );
+
+  return [{
+    ...shortestVideo,
+    withinBudget: false,
+    durationWarning: true,
+    budgetExceededBy: shortestVideo.durationSeconds - dailyBudgetSeconds,
+  }];
+};
+
+/**
+ * Select the best video for a lesson within time budget (legacy - used for fallback)
  *
  * Strategy:
  * 1. Filter out blacklisted videos (full courses, playlists, etc.)
@@ -354,32 +454,26 @@ const fetchVideosInBatches = async (lessons, courseTopic, batchSize = 5) => {
  *
  * TIME BUDGET ALLOCATION STRATEGY:
  * ================================
- * 1. Each day has a total time budget (e.g., 10 minutes)
- * 2. For each lesson in a day, we allocate time proportionally based on estimatedMinutes
- * 3. We track remaining budget as we select videos for each lesson
- * 4. Videos are selected to fit within the remaining budget
- * 5. If a video exceeds the budget, we flag it but still include it (graceful degradation)
- * 6. The ±2 minute buffer allows some flexibility in matching
+ * 1. Each day has a total time budget (e.g., 30 minutes)
+ * 2. Select 2-3 high-quality videos per day that fit within the budget
+ * 3. Videos are selected from pool of lesson-specific search results
+ * 4. Prefer fewer, quality videos over many short ones
+ * 5. The ±2 minute buffer allows some flexibility
+ * 6. If no combination fits, flag with durationWarning: true
  *
  * VIDEO SELECTION STRATEGY:
  * =========================
  * 1. Search YouTube with lesson-specific query (title + keywords + "tutorial")
  * 2. Fetch video durations using contentDetails API
- * 3. Filter out: full courses, playlists, too short (<1 min), too long (>1.5x lesson time)
+ * 3. Filter out: full courses, playlists, too short (<1 min), blacklisted titles
  * 4. Score videos by relevance (title match, keyword match, good indicators)
- * 5. Select highest-scoring video that fits the time budget
- * 6. Fallback to shortest video if none fit
+ * 5. Find best combination of 2-3 videos that fits daily budget
+ * 6. Fallback to shortest video with durationWarning if none fit
  *
- * PARALLEL FETCHING:
- * ==================
- * - Videos for all lessons in a day are fetched in parallel (batches of 5)
- * - Video selection is done sequentially to maintain budget tracking
- * - This provides 3-5x speedup while respecting API rate limits
- *
- * @param {object} coursePlan - The course plan object from OpenAI
+ * @param {object} coursePlan - The course plan object from Groq
  * @param {number} timePerDay - Daily time budget in minutes (default: 30)
  * @param {function} onProgress - Optional callback for progress updates (SSE)
- * @returns {Promise<object>} Course plan with videos added to each lesson
+ * @returns {Promise<object>} Course plan with dayVideos array per day
  */
 export const enrichCourseWithVideos = async (coursePlan, timePerDay = 30, onProgress = null) => {
   try {
@@ -387,22 +481,15 @@ export const enrichCourseWithVideos = async (coursePlan, timePerDay = 30, onProg
     const dailyBudgetSeconds = timePerDay * 60;
     const totalDays = coursePlan.dailyPlan.length;
 
-    console.log(`[YouTube] Enriching course "${courseTopic}" with ${timePerDay} min/day budget (parallel mode)`);
+    console.log(`[YouTube] Enriching course "${courseTopic}" with ${timePerDay} min/day budget (2-3 videos per day)`);
 
     const enrichedDailyPlan = [];
 
     // Process each day
     for (let dayIndex = 0; dayIndex < coursePlan.dailyPlan.length; dayIndex++) {
       const day = coursePlan.dailyPlan[dayIndex];
-      let remainingBudgetSeconds = dailyBudgetSeconds;
 
-      // Calculate total estimated time for the day
-      const totalEstimatedMinutes = day.lessons.reduce(
-        (sum, lesson) => sum + (lesson.estimatedMinutes || lesson.timeMinutes || 10),
-        0
-      );
-
-      console.log(`[YouTube] Day ${day.day}: ${day.lessons.length} lessons, ${totalEstimatedMinutes} min estimated`);
+      console.log(`[YouTube] Day ${day.day}: ${day.lessons.length} lessons`);
 
       // Emit progress event
       if (onProgress) {
@@ -417,70 +504,42 @@ export const enrichCourseWithVideos = async (coursePlan, timePerDay = 30, onProg
       // PARALLEL FETCH: Get videos for all lessons in this day at once
       const lessonVideoResults = await fetchVideosInBatches(day.lessons, courseTopic, 5);
 
-      // SEQUENTIAL SELECT: Process results and select best videos respecting budget
-      const enrichedLessons = [];
-
-      for (const { lesson, videos, error } of lessonVideoResults) {
-        if (error) {
-          enrichedLessons.push({
-            ...lesson,
-            resources: { videos: [] },
-          });
-          continue;
-        }
-
-        console.log(`[YouTube]   Lesson "${lesson.title}" - ${videos.length} videos found (budget: ${Math.floor(remainingBudgetSeconds / 60)}min remaining)`);
-
-        // Select the best video within budget
-        const selectedVideo = selectBestVideo(videos, lesson, remainingBudgetSeconds);
-
-        if (selectedVideo) {
-          // Update remaining budget
-          remainingBudgetSeconds -= selectedVideo.durationSeconds;
-
-          console.log(`[YouTube]     Selected: "${selectedVideo.title}" (${selectedVideo.durationFormatted}) ${selectedVideo.withinBudget ? '✓' : '⚠ exceeds budget'}`);
-
-          enrichedLessons.push({
-            ...lesson,
-            resources: {
-              videos: [{
-                id: selectedVideo.id,
-                title: selectedVideo.title,
-                description: selectedVideo.description,
-                thumbnail: selectedVideo.thumbnail,
-                channelTitle: selectedVideo.channelTitle,
-                url: selectedVideo.url,
-                duration: selectedVideo.durationFormatted,
-                durationSeconds: selectedVideo.durationSeconds,
-                withinBudget: selectedVideo.withinBudget,
-              }],
-            },
-          });
-        } else {
-          console.log(`[YouTube]     No suitable video found`);
-          enrichedLessons.push({
-            ...lesson,
-            resources: { videos: [] },
-          });
-        }
-      }
+      // DAY-LEVEL SELECT: Choose optimal 2-3 videos for the whole day
+      const selectedVideos = selectDayVideos(lessonVideoResults, dailyBudgetSeconds);
 
       // Calculate day's video stats
-      const dayVideoDuration = enrichedLessons.reduce((sum, lesson) => {
-        const video = lesson.resources?.videos?.[0];
-        return sum + (video?.durationSeconds || 0);
-      }, 0);
+      const dayVideoDuration = selectedVideos.reduce((sum, v) => sum + v.durationSeconds, 0);
+      const hasWarning = selectedVideos.some(v => v.durationWarning);
 
-      console.log(`[YouTube] Day ${day.day} complete: ${Math.floor(dayVideoDuration / 60)}min of videos (budget: ${timePerDay}min)`);
+      console.log(`[YouTube] Day ${day.day} complete: ${selectedVideos.length} videos, ${Math.floor(dayVideoDuration / 60)}min (budget: ${timePerDay}min)${hasWarning ? ' ⚠ EXCEEDS BUDGET' : ' ✓'}`);
 
+      // Format videos for storage
+      const dayVideos = selectedVideos.map(v => ({
+        id: v.id,
+        title: v.title,
+        description: v.description,
+        thumbnail: v.thumbnail,
+        channelTitle: v.channelTitle,
+        url: v.url,
+        duration: v.durationFormatted,
+        durationSeconds: v.durationSeconds,
+        lessonId: v.lessonId,
+        lessonTitle: v.lessonTitle,
+        withinBudget: v.withinBudget,
+        durationWarning: v.durationWarning || false,
+      }));
+
+      // Keep lessons unchanged, add videos at day level
       enrichedDailyPlan.push({
         ...day,
-        lessons: enrichedLessons,
+        dayVideos,
         videoStats: {
           totalDurationSeconds: dayVideoDuration,
           totalDurationFormatted: formatDuration(dayVideoDuration),
           budgetSeconds: dailyBudgetSeconds,
+          videoCount: selectedVideos.length,
           withinBudget: dayVideoDuration <= dailyBudgetSeconds + (TIME_BUFFER_MINUTES * 60),
+          durationWarning: hasWarning,
         },
       });
     }

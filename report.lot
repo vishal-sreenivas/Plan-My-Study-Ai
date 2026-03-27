@@ -1,0 +1,26 @@
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {1.1}{\ignorespaces Technology Stack Overview}}{9}{table.caption.2}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {2.1}{\ignorespaces REST API Endpoint Reference}}{15}{table.caption.6}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {4.1}{\ignorespaces Retry Strategy Parameters}}{21}{table.caption.7}%
+\contentsline {table}{\numberline {4.2}{\ignorespaces Video Relevance Scoring Criteria}}{22}{table.caption.8}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {6.1}{\ignorespaces Key Frontend Components}}{36}{table.caption.18}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {7.1}{\ignorespaces Course Generation Timing Breakdown (7-day, 60 min/day)}}{37}{table.caption.19}%
+\contentsline {table}{\numberline {7.2}{\ignorespaces Parallel vs.\ Sequential YouTube Fetching (14 lessons)}}{37}{table.caption.20}%
+\contentsline {table}{\numberline {7.3}{\ignorespaces AI Inference Speed Comparison}}{38}{table.caption.22}%
+\contentsline {table}{\numberline {7.4}{\ignorespaces Database Index Configuration}}{39}{table.caption.23}%
+\contentsline {table}{\numberline {7.5}{\ignorespaces Estimated Scalability Metrics}}{41}{table.caption.24}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {9.1}{\ignorespaces Input Validation Rules Across API Endpoints}}{47}{table.caption.25}%
+\contentsline {table}{\numberline {9.2}{\ignorespaces API Test Scenarios}}{48}{table.caption.26}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {10.1}{\ignorespaces Feature Comparison with Existing Platforms}}{52}{table.caption.27}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
