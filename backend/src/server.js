@@ -21,6 +21,8 @@ const app = express();
 const allowedOrigins = [
   env.frontendUrl,
   'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
   'http://localhost:3000',
 ].filter(Boolean); // Remove undefined values
 
@@ -29,20 +31,26 @@ app.use(
     origin: (origin, callback) => {
       // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
-      
+
       // Allow if origin is in allowed list
       if (allowedOrigins.some(allowed => origin === allowed || origin.startsWith(allowed))) {
+        return callback(null, true);
+      }
+
+      // Allow any Vercel deployment (preview and production)
+      if (origin.includes('.vercel.app')) {
+        return callback(null, true);
+      }
+
+      // Log blocked origin for debugging
+      console.warn(`CORS: Blocked origin: ${origin}`);
+      console.warn(`   Allowed origins: ${allowedOrigins.join(', ')}`);
+
+      // In development, allow all; in production, be strict
+      if (env.nodeEnv === 'development') {
         callback(null, true);
       } else {
-        // Log blocked origin for debugging
-        console.warn(`⚠️  CORS: Blocked origin: ${origin}`);
-        console.warn(`   Allowed origins: ${allowedOrigins.join(', ')}`);
-        // In development, allow all; in production, be strict
-        if (env.nodeEnv === 'development') {
-          callback(null, true);
-        } else {
-          callback(new Error('Not allowed by CORS'));
-        }
+        callback(new Error('Not allowed by CORS'));
       }
     },
     credentials: true,
