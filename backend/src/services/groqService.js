@@ -82,14 +82,15 @@ STRICT Requirements:
 - Each quiz tests understanding of THAT DAY's specific lessons
 - Each quiz has: question, options (4 choices with A/B/C/D prefix), correctAnswer (A/B/C/D), explanation`;
 
-      // Call Groq API with timeout (30 seconds - Groq is much faster!)
+      // Call Groq API with timeout (60 seconds)
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Request timeout - Groq took too long to respond')), 30000)
+        setTimeout(() => reject(new Error('Request timeout - Groq took too long to respond')), 60000)
       );
 
-      // Use Groq's fast models - try multiple models in case one is decommissioned
-      // Available models: llama-3.1-70b-versatile, llama-3.1-8b-instant, mixtral-8x7b-32768
-      const models = ['llama-3.1-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768'];
+      // Current active Groq models (updated March 2025)
+      // llama-3.1-70b-versatile was deprecated Jan 24 2025 → replaced by llama-3.3-70b-versatile
+      // mixtral-8x7b-32768 was deprecated → use gemma2-9b-it as fallback
+      const models = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'gemma2-9b-it'];
       let response;
       let lastError;
 
@@ -108,7 +109,7 @@ STRICT Requirements:
               },
             ],
             temperature: 0.7,
-            max_tokens: 3000,
+            max_tokens: 8000,
           });
 
           response = await Promise.race([apiPromise, timeoutPromise]);
@@ -142,8 +143,41 @@ STRICT Requirements:
         jsonString = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       }
 
-      // Parse JSON
-      const coursePlan = JSON.parse(jsonString);
+      // Attempt to repair truncated JSON (happens when response hits token limit)
+      const repairTruncatedJson = (str) => {
+        // Count open brackets/braces and close any that are unclosed
+        let depth = 0;
+        let inString = false;
+        let escape = false;
+        const stack = [];
+        for (let i = 0; i < str.length; i++) {
+          const ch = str[i];
+          if (escape) { escape = false; continue; }
+          if (ch === '\\' && inString) { escape = true; continue; }
+          if (ch === '"') { inString = !inString; continue; }
+          if (inString) continue;
+          if (ch === '{') stack.push('}');
+          else if (ch === '[') stack.push(']');
+          else if (ch === '}' || ch === ']') stack.pop();
+        }
+        // Close all unclosed structures
+        return str + stack.reverse().join('');
+      };
+
+
+      // Parse JSON — try raw first, then attempt repair for truncated responses
+      let coursePlan;
+      try {
+        coursePlan = JSON.parse(jsonString);
+      } catch (parseError) {
+        console.warn('JSON parse failed, attempting truncation repair...', parseError.message);
+        try {
+          coursePlan = JSON.parse(repairTruncatedJson(jsonString));
+          console.log('✅ Truncated JSON successfully repaired');
+        } catch (repairError) {
+          throw new Error(`Invalid JSON from Groq: ${parseError.message}`);
+        }
+      }
 
       // Validate structure
       if (!coursePlan.overview || !coursePlan.modules || !coursePlan.dailyPlan) {
@@ -155,33 +189,31 @@ STRICT Requirements:
         throw new Error(`Daily plan has ${coursePlan.dailyPlan.length} days, expected ${days}`);
       }
 
-      // QUIZ VALIDATION: Ensure exactly 4-5 quizzes per day with correct structure
-      const quizValidationErrors = [];
+      // QUIZ VALIDATION: Warn only — don't throw so we avoid unnecessary retries
       coursePlan.dailyPlan.forEach((day, index) => {
         const dayNum = day.day || index + 1;
 
-        if (!day.quizzes || !Array.isArray(day.quizzes)) {
-          quizValidationErrors.push(`Day ${dayNum}: Missing quizzes array`);
-        } else if (day.quizzes.length < 4 || day.quizzes.length > 5) {
-          quizValidationErrors.push(`Day ${dayNum}: Has ${day.quizzes.length} quizzes, expected 4-5`);
+        if (!day.quizzes || !Array.isArray(day.quizzes) || day.quizzes.length === 0) {
+          // Ensure quizzes array exists (even if empty)
+          day.quizzes = [];
+          console.warn(`Day ${dayNum}: No quizzes returned, defaulting to empty array`);
         } else {
-          // Validate each quiz structure
-          day.quizzes.forEach((quiz, qIndex) => {
-            if (!quiz.question || !quiz.options || !quiz.correctAnswer || !quiz.explanation) {
-              quizValidationErrors.push(`Day ${dayNum}, Quiz ${qIndex + 1}: Missing required fields`);
-            } else if (!Array.isArray(quiz.options) || quiz.options.length !== 4) {
-              quizValidationErrors.push(`Day ${dayNum}, Quiz ${qIndex + 1}: Must have exactly 4 options`);
-            } else if (!['A', 'B', 'C', 'D'].includes(quiz.correctAnswer)) {
-              quizValidationErrors.push(`Day ${dayNum}, Quiz ${qIndex + 1}: correctAnswer must be A, B, C, or D`);
+          // Filter out malformed quizzes instead of rejecting entire response
+          day.quizzes = day.quizzes.filter((quiz, qIndex) => {
+            const isValid =
+              quiz.question &&
+              Array.isArray(quiz.options) &&
+              quiz.options.length === 4 &&
+              quiz.correctAnswer &&
+              ['A', 'B', 'C', 'D'].includes(quiz.correctAnswer) &&
+              quiz.explanation;
+            if (!isValid) {
+              console.warn(`Day ${dayNum}, Quiz ${qIndex + 1}: Malformed quiz removed`);
             }
+            return isValid;
           });
         }
       });
-
-      if (quizValidationErrors.length > 0) {
-        console.warn('Quiz validation issues:', quizValidationErrors);
-        throw new Error(`Quiz validation failed: ${quizValidationErrors.slice(0, 3).join('; ')}`);
-      }
 
       console.log(`✅ Course plan validated: ${coursePlan.dailyPlan.length} days, ${coursePlan.dailyPlan.reduce((sum, d) => sum + (d.quizzes?.length || 0), 0)} total quizzes`);
 
@@ -298,10 +330,10 @@ Requirements:
 - Different content from the previous version`;
 
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Request timeout')), 30000)
+        setTimeout(() => reject(new Error('Request timeout')), 60000)
       );
 
-      const models = ['llama-3.1-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768'];
+      const models = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'gemma2-9b-it'];
       let response;
       let lastError;
 

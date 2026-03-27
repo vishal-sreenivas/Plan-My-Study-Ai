@@ -3,7 +3,7 @@ import VideoCard from './VideoCard';
 import LessonQuiz from '../LessonQuiz';
 import LessonNotes from '../LessonNotes';
 
-const LessonCard = ({ lesson, day, courseId, index = 0, isCompleted = false, onToggleComplete }) => {
+const LessonCard = ({ lesson, day, courseId, index = 0, isCompleted = false, onToggleComplete, videos = [] }) => {
   if (!lesson) return null;
 
   // Determine importance badge
@@ -137,8 +137,8 @@ const LessonCard = ({ lesson, day, courseId, index = 0, isCompleted = false, onT
             </div>
           )}
 
-          {/* Videos */}
-          {lesson.resources?.videos && lesson.resources.videos.length > 0 && (
+          {/* Videos - from day.dayVideos filtered by lessonId */}
+          {videos && videos.length > 0 && (
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-dark-border">
               <h5 className="text-xs font-semibold text-gray-700 dark:text-dark-text mb-3 uppercase tracking-wide flex items-center gap-2">
                 <svg className="w-4 h-4 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -152,8 +152,8 @@ const LessonCard = ({ lesson, day, courseId, index = 0, isCompleted = false, onT
                 Learning Resources
               </h5>
               <div className="grid grid-cols-1 gap-3">
-                {lesson.resources.videos.map((video, vidIdx) => (
-                  <VideoCard key={video.id} video={video} index={vidIdx} />
+                {videos.map((video, vidIdx) => (
+                  <VideoCard key={video.id || vidIdx} video={video} index={vidIdx} />
                 ))}
               </div>
             </div>

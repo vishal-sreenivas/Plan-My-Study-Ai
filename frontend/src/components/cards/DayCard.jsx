@@ -89,6 +89,8 @@ const DayCard = ({ day, courseId, isExpanded, onToggle, onLessonToggle, completi
                 {day.lessons.map((lesson, lessonIdx) => {
                   const completionKey = `${day.day}-${lesson.id}`;
                   const isCompleted = completionMap.get(completionKey) || false;
+                  // Filter day-level videos that belong to this specific lesson
+                  const lessonVideos = (day.dayVideos || []).filter(v => v.lessonId === lesson.id);
                   return (
                     <LessonCard
                       key={lesson.id || lessonIdx}
@@ -98,6 +100,7 @@ const DayCard = ({ day, courseId, isExpanded, onToggle, onLessonToggle, completi
                       index={lessonIdx}
                       isCompleted={isCompleted}
                       onToggleComplete={onLessonToggle}
+                      videos={lessonVideos}
                     />
                   );
                 })}
@@ -111,4 +114,3 @@ const DayCard = ({ day, courseId, isExpanded, onToggle, onLessonToggle, completi
 };
 
 export default DayCard;
-
